@@ -15,7 +15,7 @@ def abs_ceil(x):
 
 
 class WhiteBoard:
-    def __init__(self, screen_size=(800, 800), pixel_per_data=5):
+    def __init__(self, screen_size=(800, 800), pixel_per_data=1):
         pygame.init()
         self.screen_size = screen_size
         self.screen = pygame.display.set_mode(screen_size)
@@ -23,9 +23,17 @@ class WhiteBoard:
         self.pixel_per_data = pixel_per_data
         self.draw_was_active = False
         self.prev_mouse_pos = (0,0)
+        self.draw_color = 255
+        self.brush_size = 4
+
+    @property
+    def normalized_brush_size(self):
+        if self.brush_size < 1:
+            self.brush_size = 1
+        return int(self.brush_size)
 
     def reset_picture(self):
-        self.whiteboard_image = np.zeros(self.screen_size, 3)
+        self.whiteboard_image = np.zeros(np.ceil(np.array(self.screen_size) / self.pixel_per_data).astype(np.int32))
 
     def draw_courser(self, pos, size=5, color=(100, 100, 100)):
         surf = pygame.Surface((size,)*2)
@@ -33,13 +41,31 @@ class WhiteBoard:
         surf = surf.convert()
         self.screen.blit(surf, pos)
 
+    def draw_point(self, p):
+        img_shape = self.whiteboard_image.shape
+        if img_shape[0] > p[0] and img_shape[1] > p[1]:
+            self.whiteboard_image[int(p[0])][int(p[1])] = self.draw_color
+
+    def draw_around_point(self, point, size=3):
+        points = []
+        points.append([point[0], point[1]])
+        for i in range(1, size):
+            def f(n):
+                points.append((point[0] + n, point[1]))
+                points.append((point[0], point[1] + n))
+                points.append((point[0] + n, point[1]+n))
+            f(i)
+            f(-i)
+        for p in points:
+            self.draw_point(p)
+
     def update_image_data_with_draw_input(self):
         mouse_keys = pygame.mouse.get_pressed()
         if mouse_keys[0] == 1:
             pos = np.array(pygame.mouse.get_pos())
             whiteboard_p = pos // self.pixel_per_data
             if not self.draw_was_active:
-                self.whiteboard_image[int(whiteboard_p[0])][int(whiteboard_p[1])] = 255
+                self.draw_around_point(whiteboard_p, self.normalized_brush_size)
             else:
                 prev_p = self.prev_mouse_pos // self.pixel_per_data
                 vec = whiteboard_p - prev_p
@@ -47,7 +73,8 @@ class WhiteBoard:
                 vec = vec / shortening_fac
                 for _ in range(abs_ceil(shortening_fac)):
                     prev_p = prev_p + vec
-                    self.whiteboard_image[int(prev_p[0])][int(prev_p[1])] = 255
+                    self.draw_around_point(prev_p, self.normalized_brush_size)
+
             self.prev_mouse_pos = pos
             self.draw_was_active = True
         else:
@@ -65,6 +92,18 @@ class WhiteBoard:
     def update_loop(self):
         pygame.event.pump()
         self.update_image_data_with_draw_input()
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_KP0]:
+            self.reset_picture()
+
+        def keydown(event, key):
+            return event.type == pygame.KEYDOWN and event.key == key
+
+        for e in pygame.event.get():
+            if keydown(e, pygame.K_KP_PLUS):
+                self.brush_size += 1
+            if keydown(e, pygame.K_KP_MINUS):
+                self.brush_size -= 1
         self.draw_image()
         pygame.display.flip()
 
