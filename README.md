@@ -1,2 +1,4 @@
-# remote_whiteboard
-A simple digital whiteboard that allows online colaboration (not yet implemented).
+# whiteboard
+A simple digital whiteboard.
+
+<img src="whiteboard.gif" alt="gif" width="400"/>
